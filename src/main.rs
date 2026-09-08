@@ -1,33 +1,45 @@
 #![windows_subsystem = "windows"]
 
+mod app;
+mod config_controls;
+mod config_window;
 mod drawing;
+mod hook_config;
+mod http_server;
+mod model;
+mod raster;
 mod renderer;
+mod settings;
+mod tooltip;
+mod tooltip_content;
+mod tooltip_paint;
 mod tray;
 
-use std::time::Instant;
-
-use renderer::{BASE_HEIGHT, BASE_WIDTH, LayeredSurface};
-use tray::TrayIcon;
+use app::{AppState, HOOK_EVENT_MESSAGE, LAN_SETTING_MESSAGE};
+use renderer::pixel_size;
+use tray::TrayAction;
 use windows::{
     Win32::{
         Foundation::{HWND, LPARAM, LRESULT, WPARAM},
         System::LibraryLoader::GetModuleHandleW,
         UI::{
+            Controls::WM_MOUSELEAVE,
             HiDpi::{
                 DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2, GetDpiForSystem,
                 SetProcessDpiAwarenessContext,
             },
+            Input::KeyboardAndMouse::ReleaseCapture,
             WindowsAndMessaging::{
-                CreateWindowExW, DefWindowProcW, DispatchMessageW, GWLP_USERDATA, GetMessageW,
-                HTCAPTION, IDC_ARROW, KillTimer, LoadCursorW, MB_ICONERROR, MB_OK, MSG,
-                MessageBoxW, PostQuitMessage, RegisterClassW, SW_SHOWNOACTIVATE, SetTimer,
-                SetWindowLongPtrW, ShowWindow, TranslateMessage, WINDOW_EX_STYLE, WM_DESTROY,
-                WM_NCDESTROY, WM_NCHITTEST, WM_TIMER, WNDCLASSW, WS_EX_LAYERED, WS_EX_TOOLWINDOW,
-                WS_EX_TOPMOST, WS_POPUP,
+                CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, GWLP_USERDATA,
+                GetMessageW, HTCAPTION, IDC_ARROW, KillTimer, LoadCursorW, MB_ICONERROR, MB_OK,
+                MSG, MessageBoxW, PostQuitMessage, RegisterClassW, SendMessageW, SetTimer,
+                SetWindowLongPtrW, TranslateMessage, WINDOW_EX_STYLE, WM_DESTROY, WM_LBUTTONDOWN,
+                WM_MOUSEMOVE, WM_NCDESTROY, WM_NCLBUTTONDOWN, WM_TIMER, WNDCLASSW, WS_EX_LAYERED,
+                WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
             },
         },
     },
-    core::{Error, PCWSTR, Result, w},
+    core::{Error, HRESULT, PCWSTR, Result, w},
 };
 
 const CLASS_NAME: PCWSTR = w!("VibePulseSignalWindow");
@@ -35,27 +47,7 @@ const WINDOW_MARGIN: f32 = 18.0;
 const CONTENT_SCALE: f32 = 0.32;
 const TIMER_ID: usize = 1;
 const FRAME_INTERVAL_MS: u32 = 33;
-
-struct AppState {
-    surface: LayeredSurface,
-    tray: Option<TrayIcon>,
-    started_at: Instant,
-}
-
-impl AppState {
-    fn new(scale: f32) -> Result<Self> {
-        Ok(Self {
-            surface: LayeredSurface::new(scale)?,
-            tray: None,
-            started_at: Instant::now(),
-        })
-    }
-
-    fn draw(&mut self, hwnd: HWND) -> Result<()> {
-        self.surface.render(self.started_at.elapsed().as_secs_f32());
-        self.surface.present(hwnd)
-    }
-}
+const APP_FAILURE: HRESULT = HRESULT(0x80004005_u32 as i32);
 
 fn main() {
     if let Err(error) = run() {
@@ -64,29 +56,33 @@ fn main() {
 }
 
 fn run() -> Result<()> {
-    unsafe { SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2)? };
-    let instance = unsafe { GetModuleHandleW(None)? };
+    unsafe { SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2) }
+        .map_err(|error| win_error("无法启用 DPI 感知", error))?;
+    let instance =
+        unsafe { GetModuleHandleW(None) }.map_err(|error| win_error("无法获取应用模块", error))?;
+    let cursor = unsafe { LoadCursorW(None, IDC_ARROW) }
+        .map_err(|error| win_error("无法加载鼠标指针", error))?;
     let class = WNDCLASSW {
-        hCursor: unsafe { LoadCursorW(None, IDC_ARROW)? },
+        hCursor: cursor,
         hInstance: instance.into(),
         lpszClassName: CLASS_NAME,
         lpfnWndProc: Some(window_proc),
         ..Default::default()
     };
     if unsafe { RegisterClassW(&class) } == 0 {
-        return Err(Error::from_thread());
+        return Err(win_error("无法注册主窗口", Error::from_thread()));
     }
-
     let dpi_scale = unsafe { GetDpiForSystem() } as f32 / 96.0;
     let render_scale = dpi_scale * CONTENT_SCALE;
-    let hwnd = create_window(instance.into(), dpi_scale, render_scale)?;
+    let hwnd = create_window(instance.into(), dpi_scale, render_scale)
+        .map_err(|error| win_error("无法创建主窗口", error))?;
     if let Err(error) = initialize_window(hwnd, render_scale) {
         unsafe {
-            let _ = windows::Win32::UI::WindowsAndMessaging::DestroyWindow(hwnd);
+            let _ = DestroyWindow(hwnd);
         }
-        return Err(error);
+        return Err(win_error("无法初始化应用状态", error));
     }
-    message_loop()
+    message_loop().map_err(|error| win_error("主消息循环异常", error))
 }
 
 fn create_window(
@@ -94,17 +90,17 @@ fn create_window(
     dpi_scale: f32,
     render_scale: f32,
 ) -> Result<HWND> {
-    let extended_style = WINDOW_EX_STYLE(WS_EX_LAYERED.0 | WS_EX_TOPMOST.0 | WS_EX_TOOLWINDOW.0);
+    let (width, height) = pixel_size(1, render_scale);
     unsafe {
         CreateWindowExW(
-            extended_style,
+            WINDOW_EX_STYLE(WS_EX_LAYERED.0 | WS_EX_TOPMOST.0 | WS_EX_TOOLWINDOW.0),
             CLASS_NAME,
-            w!("横排红绿灯"),
+            w!("Vibe Pulse"),
             WS_POPUP,
             (WINDOW_MARGIN * dpi_scale).round() as i32,
             (WINDOW_MARGIN * dpi_scale).round() as i32,
-            (BASE_WIDTH as f32 * render_scale).round() as i32,
-            (BASE_HEIGHT as f32 * render_scale).round() as i32,
+            width,
+            height,
             None,
             None,
             Some(instance),
@@ -114,12 +110,9 @@ fn create_window(
 }
 
 fn initialize_window(hwnd: HWND, scale: f32) -> Result<()> {
-    let mut state = Box::new(AppState::new(scale)?);
-    state.tray = Some(TrayIcon::new(hwnd)?);
-    state.draw(hwnd)?;
+    let state = Box::new(AppState::new(hwnd, scale)?);
     unsafe {
         SetWindowLongPtrW(hwnd, GWLP_USERDATA, Box::into_raw(state) as isize);
-        let _ = ShowWindow(hwnd, SW_SHOWNOACTIVATE);
         if SetTimer(Some(hwnd), TIMER_ID, FRAME_INTERVAL_MS, None) == 0 {
             return Err(Error::from_thread());
         }
@@ -150,29 +143,30 @@ unsafe extern "system" fn window_proc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
-    match message {
-        WM_NCHITTEST => LRESULT(HTCAPTION as isize),
+    let result = match message {
+        HOOK_EVENT_MESSAGE => unsafe { app_state(hwnd) }.map(|state| state.receive_hooks(hwnd)),
         WM_TIMER if wparam.0 == TIMER_ID => {
-            if let Some(state) = unsafe { app_state(hwnd) }
-                && let Err(error) = state.draw(hwnd)
-            {
-                show_error(&error);
-                unsafe {
-                    let _ = windows::Win32::UI::WindowsAndMessaging::DestroyWindow(hwnd);
-                }
-            }
-            LRESULT(0)
+            unsafe { app_state(hwnd) }.map(|state| state.tick(hwnd))
+        }
+        WM_MOUSEMOVE => unsafe { app_state(hwnd) }.map(|state| {
+            let (_, y) = cursor_position(lparam);
+            state.mouse_move(hwnd, y)
+        }),
+        WM_MOUSELEAVE => unsafe { app_state(hwnd) }.map(|state| state.mouse_leave(hwnd)),
+        WM_LBUTTONDOWN => unsafe { app_state(hwnd) }.map(|state| handle_click(hwnd, state, lparam)),
+        LAN_SETTING_MESSAGE => {
+            unsafe { app_state(hwnd) }.map(|state| state.save_lan_setting(wparam.0 != 0))
         }
         tray::CALLBACK_MESSAGE => {
-            tray::handle_callback(hwnd, lparam);
-            LRESULT(0)
+            handle_tray_action(hwnd, lparam);
+            return LRESULT(0);
         }
         WM_DESTROY => {
             unsafe {
                 let _ = KillTimer(Some(hwnd), TIMER_ID);
+                PostQuitMessage(0);
             }
-            unsafe { PostQuitMessage(0) };
-            LRESULT(0)
+            return LRESULT(0);
         }
         WM_NCDESTROY => {
             let pointer = unsafe { SetWindowLongPtrW(hwnd, GWLP_USERDATA, 0) } as *mut AppState;
@@ -181,9 +175,45 @@ unsafe extern "system" fn window_proc(
                     drop(Box::from_raw(pointer));
                 }
             }
-            unsafe { DefWindowProcW(hwnd, message, wparam, lparam) }
+            return unsafe { DefWindowProcW(hwnd, message, wparam, lparam) };
         }
-        _ => unsafe { DefWindowProcW(hwnd, message, wparam, lparam) },
+        _ => return unsafe { DefWindowProcW(hwnd, message, wparam, lparam) },
+    };
+    if let Some(Err(error)) = result {
+        show_error(&error);
+    }
+    LRESULT(0)
+}
+
+fn handle_click(hwnd: HWND, state: &mut AppState, lparam: LPARAM) -> Result<()> {
+    let (x, y) = cursor_position(lparam);
+    if !state.click(hwnd, x, y)? {
+        unsafe {
+            let _ = ReleaseCapture();
+            SendMessageW(
+                hwnd,
+                WM_NCLBUTTONDOWN,
+                Some(WPARAM(HTCAPTION as usize)),
+                Some(LPARAM(0)),
+            );
+        }
+    }
+    Ok(())
+}
+
+fn handle_tray_action(hwnd: HWND, lparam: LPARAM) {
+    match tray::handle_callback(hwnd, lparam) {
+        Some(TrayAction::OpenConfig) => {
+            if let Some(state) = unsafe { app_state(hwnd) }
+                && let Err(error) = config_window::show(hwnd, state.settings())
+            {
+                show_error(&error);
+            }
+        }
+        Some(TrayAction::Exit) => unsafe {
+            let _ = DestroyWindow(hwnd);
+        },
+        None => {}
     }
 }
 
@@ -193,10 +223,25 @@ unsafe fn app_state(hwnd: HWND) -> Option<&'static mut AppState> {
     unsafe { pointer.as_mut() }
 }
 
+fn cursor_position(lparam: LPARAM) -> (i32, i32) {
+    let value = lparam.0 as u32;
+    (
+        (value as u16 as i16) as i32,
+        ((value >> 16) as u16 as i16) as i32,
+    )
+}
+
+fn win_error(context: &str, error: Error) -> Error {
+    let code = if error.code().is_ok() {
+        APP_FAILURE
+    } else {
+        error.code()
+    };
+    Error::new(code, format!("{context}：{error}"))
+}
+
 fn show_error(error: &Error) {
-    let text: Vec<u16> = format!("红绿灯启动失败：{error}\0")
-        .encode_utf16()
-        .collect();
+    let text: Vec<u16> = format!("Vibe Pulse：{error}\0").encode_utf16().collect();
     unsafe {
         let _ = MessageBoxW(
             None,

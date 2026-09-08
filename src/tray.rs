@@ -7,10 +7,10 @@ use windows::{
                 Shell_NotifyIconW,
             },
             WindowsAndMessaging::{
-                AppendMenuW, CreateIcon, CreatePopupMenu, DestroyIcon, DestroyMenu, DestroyWindow,
-                GetCursorPos, HICON, MF_STRING, SetForegroundWindow, TPM_BOTTOMALIGN,
+                AppendMenuW, CreateIcon, CreatePopupMenu, DestroyIcon, DestroyMenu, GetCursorPos,
+                HICON, MF_SEPARATOR, MF_STRING, SetForegroundWindow, TPM_BOTTOMALIGN,
                 TPM_RETURNCMD, TPM_RIGHTALIGN, TPM_RIGHTBUTTON, TrackPopupMenu, WM_CONTEXTMENU,
-                WM_RBUTTONUP,
+                WM_LBUTTONDBLCLK, WM_RBUTTONUP,
             },
         },
     },
@@ -19,8 +19,14 @@ use windows::{
 
 pub const CALLBACK_MESSAGE: u32 = 0x8001;
 const ICON_ID: u32 = 1;
-const EXIT_COMMAND: usize = 100;
+const OPEN_CONFIG_COMMAND: usize = 100;
+const EXIT_COMMAND: usize = 101;
 const ICON_SIZE: usize = 32;
+
+pub enum TrayAction {
+    OpenConfig,
+    Exit,
+}
 
 pub struct TrayIcon {
     hwnd: HWND,
@@ -53,22 +59,28 @@ impl Drop for TrayIcon {
     }
 }
 
-pub fn handle_callback(hwnd: HWND, lparam: LPARAM) {
-    let message = lparam.0 as u32;
-    if message == WM_RBUTTONUP || message == WM_CONTEXTMENU {
-        unsafe { show_context_menu(hwnd) };
+pub fn handle_callback(hwnd: HWND, lparam: LPARAM) -> Option<TrayAction> {
+    match lparam.0 as u32 {
+        WM_LBUTTONDBLCLK => Some(TrayAction::OpenConfig),
+        WM_RBUTTONUP | WM_CONTEXTMENU => unsafe { show_context_menu(hwnd) },
+        _ => None,
     }
 }
 
-unsafe fn show_context_menu(hwnd: HWND) {
+unsafe fn show_context_menu(hwnd: HWND) -> Option<TrayAction> {
     let Ok(menu) = (unsafe { CreatePopupMenu() }) else {
-        return;
+        return None;
     };
-    if unsafe { AppendMenuW(menu, MF_STRING, EXIT_COMMAND, w!("退出")) }.is_err() {
+    let menu_result = unsafe {
+        AppendMenuW(menu, MF_STRING, OPEN_CONFIG_COMMAND, w!("配置"))
+            .and_then(|_| AppendMenuW(menu, MF_SEPARATOR, 0, None))
+            .and_then(|_| AppendMenuW(menu, MF_STRING, EXIT_COMMAND, w!("退出")))
+    };
+    if menu_result.is_err() {
         unsafe {
             let _ = DestroyMenu(menu);
         }
-        return;
+        return None;
     }
     let mut cursor = POINT::default();
     unsafe {
@@ -89,10 +101,10 @@ unsafe fn show_context_menu(hwnd: HWND) {
     unsafe {
         let _ = DestroyMenu(menu);
     }
-    if command.0 as usize == EXIT_COMMAND {
-        unsafe {
-            let _ = DestroyWindow(hwnd);
-        }
+    match command.0 as usize {
+        OPEN_CONFIG_COMMAND => Some(TrayAction::OpenConfig),
+        EXIT_COMMAND => Some(TrayAction::Exit),
+        _ => None,
     }
 }
 

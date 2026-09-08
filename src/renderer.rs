@@ -1,6 +1,9 @@
 use std::{ffi::c_void, mem::size_of, ptr::copy_nonoverlapping};
 
-use crate::drawing::Canvas;
+use crate::{
+    drawing::{BASE_WIDTH, Canvas, GROUP_HEIGHT},
+    model::Session,
+};
 use windows::{
     Win32::{
         Foundation::{COLORREF, HWND, POINT, SIZE},
@@ -14,30 +17,24 @@ use windows::{
     core::{Error, Result},
 };
 
-pub const BASE_WIDTH: i32 = 404;
-pub const BASE_HEIGHT: i32 = 156;
-
 pub struct LayeredSurface {
     dc: HDC,
     bitmap: HBITMAP,
     previous: HGDIOBJ,
     bits: *mut u32,
     canvas: Canvas,
+    scale: f32,
 }
 
 impl LayeredSurface {
     pub fn new(scale: f32) -> Result<Self> {
-        let width = (BASE_WIDTH as f32 * scale).round() as i32;
-        let height = (BASE_HEIGHT as f32 * scale).round() as i32;
-        let info = bitmap_info(width, height);
-        let mut bits = std::ptr::null_mut::<c_void>();
+        let (width, height) = pixel_size(1, scale);
         unsafe {
             let dc = CreateCompatibleDC(None);
             if dc.0.is_null() {
                 return Err(Error::from_thread());
             }
-            let bitmap = match CreateDIBSection(Some(dc), &info, DIB_RGB_COLORS, &mut bits, None, 0)
-            {
+            let (bitmap, bits) = match create_bitmap(dc, width, height) {
                 Ok(bitmap) => bitmap,
                 Err(error) => {
                     let _ = DeleteDC(dc);
@@ -49,14 +46,21 @@ impl LayeredSurface {
                 dc,
                 bitmap,
                 previous,
-                bits: bits.cast(),
+                bits,
                 canvas: Canvas::new(width, height, scale),
+                scale,
             })
         }
     }
 
-    pub fn render(&mut self, elapsed_seconds: f32) {
-        self.canvas.render(elapsed_seconds);
+    pub fn render(
+        &mut self,
+        sessions: &[Session],
+        hovered: Option<usize>,
+        elapsed_seconds: f32,
+    ) -> Result<()> {
+        self.resize(sessions.len())?;
+        self.canvas.render(sessions, hovered, elapsed_seconds);
         unsafe {
             copy_nonoverlapping(
                 self.canvas.pixels.as_ptr(),
@@ -64,6 +68,7 @@ impl LayeredSurface {
                 self.canvas.pixels.len(),
             );
         }
+        Ok(())
     }
 
     pub fn present(&self, hwnd: HWND) -> Result<()> {
@@ -98,6 +103,22 @@ impl LayeredSurface {
             result
         }
     }
+
+    fn resize(&mut self, group_count: usize) -> Result<()> {
+        let (width, height) = pixel_size(group_count, self.scale);
+        if self.canvas.height == height {
+            return Ok(());
+        }
+        unsafe {
+            let (bitmap, bits) = create_bitmap(self.dc, width, height)?;
+            let old_bitmap = SelectObject(self.dc, bitmap.into());
+            let _ = DeleteObject(old_bitmap);
+            self.bitmap = bitmap;
+            self.bits = bits;
+            self.canvas.resize(height);
+        }
+        Ok(())
+    }
 }
 
 impl Drop for LayeredSurface {
@@ -108,6 +129,19 @@ impl Drop for LayeredSurface {
             let _ = DeleteDC(self.dc);
         }
     }
+}
+
+pub fn pixel_size(group_count: usize, scale: f32) -> (i32, i32) {
+    let width = (BASE_WIDTH as f32 * scale).round() as i32;
+    let height = (GROUP_HEIGHT as f32 * scale * group_count.max(1) as f32).round() as i32;
+    (width, height)
+}
+
+unsafe fn create_bitmap(dc: HDC, width: i32, height: i32) -> Result<(HBITMAP, *mut u32)> {
+    let info = bitmap_info(width, height);
+    let mut bits = std::ptr::null_mut::<c_void>();
+    let bitmap = unsafe { CreateDIBSection(Some(dc), &info, DIB_RGB_COLORS, &mut bits, None, 0)? };
+    Ok((bitmap, bits.cast()))
 }
 
 fn bitmap_info(width: i32, height: i32) -> BITMAPINFO {
