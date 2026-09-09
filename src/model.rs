@@ -122,7 +122,7 @@ impl Session {
 #[derive(Default)]
 pub struct SessionStore {
     sessions: Vec<Session>,
-    dismissed: HashSet<SessionKey>,
+    ended_sessions: HashSet<SessionKey>,
 }
 
 impl SessionStore {
@@ -131,8 +131,12 @@ impl SessionStore {
     }
 
     pub fn apply(&mut self, event: HookEvent, now: Instant) {
-        if self.dismissed.contains(&event.key) {
-            return;
+        if self.ended_sessions.contains(&event.key) {
+            if event.name != "SessionStart" {
+                return;
+            }
+            self.ended_sessions.remove(&event.key);
+            self.sessions.retain(|session| session.key != event.key);
         }
         if event.name == "SessionEnd" {
             self.finish(event.key, now);
@@ -152,29 +156,20 @@ impl SessionStore {
         if index >= self.sessions.len() {
             return;
         }
-        let session = self.sessions.remove(index);
-        self.dismissed.insert(session.key);
+        self.sessions.remove(index);
     }
 
     pub fn remove_finished(&mut self, now: Instant) {
-        let mut removed = Vec::new();
-        self.sessions.retain(|session| {
-            let should_remove = session.remove_at.is_some_and(|deadline| now >= deadline);
-            if should_remove {
-                removed.push(session.key.clone());
-            }
-            !should_remove
-        });
-        self.dismissed.extend(removed);
+        self.sessions
+            .retain(|session| !session.remove_at.is_some_and(|deadline| now >= deadline));
     }
 
     fn finish(&mut self, key: SessionKey, now: Instant) {
+        self.ended_sessions.insert(key.clone());
         let Some(session) = self.sessions.iter_mut().find(|item| item.key == key) else {
-            self.dismissed.insert(key);
             return;
         };
         if session.status == SessionStatus::Failed {
-            self.dismissed.insert(key);
             return;
         }
         session.status = SessionStatus::Finishing;
