@@ -1,26 +1,39 @@
-use std::{env, ffi::c_void};
-
 use windows::{
     Win32::{
-        Foundation::{HWND, LPARAM, WPARAM},
-        Graphics::Gdi::{DEFAULT_GUI_FONT, GetStockObject},
+        Foundation::{HWND, LPARAM, LRESULT, WPARAM},
+        Graphics::Gdi::{HFONT, InvalidateRect},
         UI::{
-            Controls::BST_CHECKED,
+            Input::KeyboardAndMouse::EnableWindow,
             WindowsAndMessaging::{
-                BM_SETCHECK, BS_AUTOCHECKBOX, CreateWindowExW, GetWindowTextLengthW,
-                GetWindowTextW, HMENU, SendMessageW, WINDOW_EX_STYLE, WINDOW_STYLE, WM_SETFONT,
-                WS_BORDER, WS_CHILD, WS_TABSTOP, WS_VISIBLE,
+                CB_ADDSTRING, CB_GETCURSEL, CB_GETLBTEXT, CB_GETLBTEXTLEN, CB_RESETCONTENT,
+                CB_SETCURSEL, GetWindowTextLengthW, GetWindowTextW, SendMessageW,
             },
         },
     },
-    core::{PCWSTR, Result, w},
+    core::{Error, HRESULT, Result},
 };
 
-const ADDRESS_ID: isize = 101;
-const HOST_ID: isize = 102;
-const LAN_ID: isize = 103;
+use crate::config_control_factory;
+
+pub const ADDRESS_ID: isize = 101;
+pub const HOST_ID: isize = 102;
+pub const LAN_ID: isize = 103;
 pub const COPY_QODER_ID: isize = 104;
 pub const COPY_CLAUDE_ID: isize = 105;
+pub const CLOSE_ID: isize = 106;
+pub const WINDOW_WIDTH: i32 = 700;
+pub const WINDOW_HEIGHT: i32 = 432;
+pub const TITLEBAR_HEIGHT: i32 = 68;
+pub const CLOSE_LEFT: i32 = 650;
+pub const FIELD_LEFT: i32 = 166;
+pub const FIELD_WIDTH: i32 = 490;
+pub const ADDRESS_TOP: i32 = 86;
+pub const HOST_TOP: i32 = 132;
+pub const LAN_TOP: i32 = 196;
+pub const COPY_TOP: i32 = 368;
+
+const APP_FAILURE: HRESULT = HRESULT(0x80004005_u32 as i32);
+const LOCAL_ADDRESS: &str = "127.0.0.1";
 
 #[derive(Default)]
 pub struct ConfigControls {
@@ -29,119 +42,125 @@ pub struct ConfigControls {
     pub lan: HWND,
 }
 
-struct ControlSpec<'a> {
-    class: PCWSTR,
-    text: &'a str,
-    style: WINDOW_STYLE,
-    x: i32,
-    y: i32,
-    width: i32,
-    height: i32,
-    id: isize,
+pub struct ConfigControlInit<'a> {
+    pub parent: HWND,
+    pub allow_lan: bool,
+    pub selected_address: &'a str,
+    pub private_addresses: &'a [String],
+    pub font: HFONT,
 }
 
-pub fn create(parent: HWND, allow_lan: bool) -> Result<ConfigControls> {
-    create_label(
-        parent,
-        "HTTP Hooks 配置仅复制到剪贴板，不会修改任何配置文件。",
-        24,
-        20,
-        590,
-    )?;
-    let (address, host) = create_identity_controls(parent)?;
-    let lan = create_lan_control(parent, allow_lan)?;
-    create_action_controls(parent)?;
-    Ok(ConfigControls { address, host, lan })
+pub struct ScopeSelection<'a> {
+    pub allow_lan: bool,
+    pub selected_address: &'a str,
+    pub private_addresses: &'a [String],
 }
 
-fn create_identity_controls(parent: HWND) -> Result<(HWND, HWND)> {
-    create_label(parent, "服务地址", 24, 58, 90)?;
-    let address = create_control(
-        parent,
-        ControlSpec {
-            class: w!("EDIT"),
-            text: "127.0.0.1",
-            style: WS_BORDER | WS_TABSTOP,
-            x: 118,
-            y: 54,
-            width: 490,
-            height: 26,
-            id: ADDRESS_ID,
-        },
-    )?;
-    create_label(parent, "来源主机名", 24, 96, 90)?;
-    let host_name = env::var("COMPUTERNAME").unwrap_or_else(|_| "windows-client".to_owned());
-    let host = create_control(
-        parent,
-        ControlSpec {
-            class: w!("EDIT"),
-            text: &host_name,
-            style: WS_BORDER | WS_TABSTOP,
-            x: 118,
-            y: 92,
-            width: 490,
-            height: 26,
-            id: HOST_ID,
-        },
-    )?;
-    Ok((address, host))
+struct ControlMessage {
+    id: u32,
+    wparam: usize,
+    lparam: isize,
 }
 
-fn create_lan_control(parent: HWND, allow_lan: bool) -> Result<HWND> {
-    let lan = create_control(
-        parent,
-        ControlSpec {
-            class: w!("BUTTON"),
-            text: "允许 WSL2 / 局域网接入（重启软件后生效）",
-            style: WINDOW_STYLE(WS_TABSTOP.0 | BS_AUTOCHECKBOX as u32),
-            x: 24,
-            y: 134,
-            width: 430,
-            height: 26,
-            id: LAN_ID,
-        },
+pub fn create(init: ConfigControlInit<'_>) -> Result<ConfigControls> {
+    let controls = config_control_factory::create(init.parent, init.font)?;
+    let target = scope_address(
+        init.allow_lan,
+        init.selected_address,
+        init.private_addresses,
     )?;
-    if allow_lan {
-        send(lan, BM_SETCHECK, BST_CHECKED.0 as usize, 0);
+    apply_scope(
+        &controls,
+        ScopeSelection {
+            allow_lan: init.allow_lan,
+            selected_address: &target,
+            private_addresses: init.private_addresses,
+        },
+    );
+    Ok(controls)
+}
+
+pub fn scope_address(
+    allow_lan: bool,
+    preferred: &str,
+    private_addresses: &[String],
+) -> Result<String> {
+    if !allow_lan {
+        return Ok(LOCAL_ADDRESS.to_owned());
     }
-    Ok(lan)
+    private_addresses
+        .iter()
+        .find(|address| address.as_str() == preferred)
+        .or_else(|| private_addresses.first())
+        .cloned()
+        .ok_or_else(|| Error::new(APP_FAILURE, "未检测到可用的内网 IPv4 地址"))
 }
 
-fn create_action_controls(parent: HWND) -> Result<()> {
-    create_label(
-        parent,
-        "本机填 127.0.0.1；WSL2 填 Windows 主机地址；其他电脑填本机局域网地址。",
-        24,
-        174,
-        590,
-    )?;
-    create_control(
-        parent,
-        ControlSpec {
-            class: w!("BUTTON"),
-            text: "复制 Qoder 配置",
-            style: WS_TABSTOP,
-            x: 24,
-            y: 218,
-            width: 180,
-            height: 38,
-            id: COPY_QODER_ID,
+pub fn apply_scope(controls: &ConfigControls, selection: ScopeSelection<'_>) {
+    reset_combo(controls.address);
+    let selected = if selection.allow_lan {
+        selection
+            .private_addresses
+            .iter()
+            .for_each(|address| add_combo_item(controls.address, address));
+        selection
+            .private_addresses
+            .iter()
+            .position(|address| address == selection.selected_address)
+            .unwrap_or_default()
+    } else {
+        add_combo_item(controls.address, LOCAL_ADDRESS);
+        0
+    };
+    send(
+        controls.address,
+        ControlMessage {
+            id: CB_SETCURSEL,
+            wparam: selected,
+            lparam: 0,
         },
-    )?;
-    create_control(
-        parent,
-        ControlSpec {
-            class: w!("BUTTON"),
-            text: "复制 Claude Code 配置",
-            style: WS_TABSTOP,
-            x: 222,
-            y: 218,
-            width: 210,
-            height: 38,
-            id: COPY_CLAUDE_ID,
+    );
+    unsafe {
+        let _ = EnableWindow(controls.address, selection.allow_lan);
+        let _ = InvalidateRect(Some(controls.lan), None, true);
+    }
+}
+
+pub fn selected_address(controls: &ConfigControls) -> Result<String> {
+    let index = send(
+        controls.address,
+        ControlMessage {
+            id: CB_GETCURSEL,
+            wparam: 0,
+            lparam: 0,
         },
-    )?;
-    Ok(())
+    )
+    .0;
+    if index < 0 {
+        return Err(Error::new(APP_FAILURE, "服务地址未选择"));
+    }
+    let length = send(
+        controls.address,
+        ControlMessage {
+            id: CB_GETLBTEXTLEN,
+            wparam: index as usize,
+            lparam: 0,
+        },
+    )
+    .0;
+    if length < 0 {
+        return Err(Error::new(APP_FAILURE, "无法读取服务地址"));
+    }
+    let mut text = vec![0u16; length as usize + 1];
+    send(
+        controls.address,
+        ControlMessage {
+            id: CB_GETLBTEXT,
+            wparam: index as usize,
+            lparam: text.as_mut_ptr() as isize,
+        },
+    );
+    Ok(String::from_utf16_lossy(&text[..length as usize]))
 }
 
 pub fn window_text(hwnd: HWND) -> String {
@@ -151,47 +170,36 @@ pub fn window_text(hwnd: HWND) -> String {
     String::from_utf16_lossy(&text[..copied as usize])
 }
 
-fn create_label(parent: HWND, text: &str, x: i32, y: i32, width: i32) -> Result<HWND> {
-    create_control(
-        parent,
-        ControlSpec {
-            class: w!("STATIC"),
-            text,
-            style: WINDOW_STYLE(0),
-            x,
-            y,
-            width,
-            height: 24,
-            id: 0,
+fn reset_combo(hwnd: HWND) {
+    send(
+        hwnd,
+        ControlMessage {
+            id: CB_RESETCONTENT,
+            wparam: 0,
+            lparam: 0,
         },
-    )
+    );
 }
 
-fn create_control(parent: HWND, spec: ControlSpec<'_>) -> Result<HWND> {
-    let text: Vec<u16> = spec.text.encode_utf16().chain([0]).collect();
-    let hwnd = unsafe {
-        CreateWindowExW(
-            WINDOW_EX_STYLE(0),
-            spec.class,
-            PCWSTR(text.as_ptr()),
-            WS_CHILD | WS_VISIBLE | spec.style,
-            spec.x,
-            spec.y,
-            spec.width,
-            spec.height,
-            Some(parent),
-            Some(HMENU(spec.id as *mut c_void)),
-            None,
-            None,
-        )?
-    };
-    let font = unsafe { GetStockObject(DEFAULT_GUI_FONT) };
-    send(hwnd, WM_SETFONT, font.0 as usize, 1);
-    Ok(hwnd)
+fn add_combo_item(hwnd: HWND, value: &str) {
+    let text: Vec<u16> = value.encode_utf16().chain([0]).collect();
+    send(
+        hwnd,
+        ControlMessage {
+            id: CB_ADDSTRING,
+            wparam: 0,
+            lparam: text.as_ptr() as isize,
+        },
+    );
 }
 
-fn send(hwnd: HWND, message: u32, wparam: usize, lparam: isize) {
+fn send(hwnd: HWND, message: ControlMessage) -> LRESULT {
     unsafe {
-        SendMessageW(hwnd, message, Some(WPARAM(wparam)), Some(LPARAM(lparam)));
+        SendMessageW(
+            hwnd,
+            message.id,
+            Some(WPARAM(message.wparam)),
+            Some(LPARAM(message.lparam)),
+        )
     }
 }

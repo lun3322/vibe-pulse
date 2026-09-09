@@ -26,14 +26,12 @@ use crate::{
 
 const APP_FAILURE: HRESULT = HRESULT(0x80004005_u32 as i32);
 pub const HOOK_EVENT_MESSAGE: u32 = 0x8002;
-pub const LAN_SETTING_MESSAGE: u32 = 0x8003;
 
 pub struct AppState {
     _server: HookServer,
     surface: LayeredSurface,
     _tray: TrayIcon,
     tooltip: Tooltip,
-    settings: Settings,
     events: Receiver<HookEvent>,
     sessions: SessionStore,
     hovered: Option<usize>,
@@ -59,17 +57,12 @@ impl AppState {
                 .map_err(|error| win_error("无法创建绘制表面", error))?,
             _tray: TrayIcon::new(hwnd).map_err(|error| win_error("无法创建托盘图标", error))?,
             tooltip: Tooltip::new(hwnd).map_err(|error| win_error("无法创建悬停提示", error))?,
-            settings,
             events,
             sessions: SessionStore::default(),
             hovered: None,
             started_at: Instant::now(),
             scale,
         })
-    }
-
-    pub fn settings(&self) -> &Settings {
-        &self.settings
     }
 
     pub fn receive_hooks(&mut self, hwnd: HWND) -> Result<()> {
@@ -133,11 +126,6 @@ impl AppState {
             return Ok(true);
         }
         Ok(false)
-    }
-
-    pub fn save_lan_setting(&mut self, enabled: bool) -> Result<()> {
-        self.settings.allow_lan = enabled;
-        self.settings.save().map_err(app_error)
     }
 
     fn draw(&mut self, hwnd: HWND) -> Result<()> {

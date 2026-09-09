@@ -1,12 +1,21 @@
 #![windows_subsystem = "windows"]
 
 mod app;
+mod clipboard;
+mod config_actions;
+mod config_button_paint;
+mod config_combo_box;
+mod config_control_factory;
 mod config_controls;
+mod config_paint;
+mod config_paint_primitives;
+mod config_theme;
 mod config_window;
 mod drawing;
 mod hook_config;
 mod http_server;
 mod model;
+mod network;
 mod raster;
 mod renderer;
 mod settings;
@@ -15,7 +24,7 @@ mod tooltip_content;
 mod tooltip_paint;
 mod tray;
 
-use app::{AppState, HOOK_EVENT_MESSAGE, LAN_SETTING_MESSAGE};
+use app::{AppState, HOOK_EVENT_MESSAGE};
 use renderer::pixel_size;
 use tray::TrayAction;
 use windows::{
@@ -154,9 +163,6 @@ unsafe extern "system" fn window_proc(
         }),
         WM_MOUSELEAVE => unsafe { app_state(hwnd) }.map(|state| state.mouse_leave(hwnd)),
         WM_LBUTTONDOWN => unsafe { app_state(hwnd) }.map(|state| handle_click(hwnd, state, lparam)),
-        LAN_SETTING_MESSAGE => {
-            unsafe { app_state(hwnd) }.map(|state| state.save_lan_setting(wparam.0 != 0))
-        }
         tray::CALLBACK_MESSAGE => {
             handle_tray_action(hwnd, lparam);
             return LRESULT(0);
@@ -204,9 +210,7 @@ fn handle_click(hwnd: HWND, state: &mut AppState, lparam: LPARAM) -> Result<()> 
 fn handle_tray_action(hwnd: HWND, lparam: LPARAM) {
     match tray::handle_callback(hwnd, lparam) {
         Some(TrayAction::OpenConfig) => {
-            if let Some(state) = unsafe { app_state(hwnd) }
-                && let Err(error) = config_window::show(hwnd, state.settings())
-            {
+            if let Err(error) = config_window::show(hwnd) {
                 show_error(&error);
             }
         }

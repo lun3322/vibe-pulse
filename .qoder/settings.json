@@ -1,0 +1,212 @@
+{
+  "hooks": {
+    "Elicitation": [
+      {
+        "hooks": [
+          {
+            "headers": {
+              "Authorization": "Bearer 346c5eee22fcaea80fb852b41c13f44049dfc4460ef2a8ba159bb2489ca2610d",
+              "X-Vibe-Client": "qoder",
+              "X-Vibe-Host": "CHEN"
+            },
+            "timeout": 10,
+            "type": "http",
+            "url": "http://192.168.20.103:17321/hooks"
+          }
+        ]
+      }
+    ],
+    "ElicitationResult": [
+      {
+        "hooks": [
+          {
+            "headers": {
+              "Authorization": "Bearer 346c5eee22fcaea80fb852b41c13f44049dfc4460ef2a8ba159bb2489ca2610d",
+              "X-Vibe-Client": "qoder",
+              "X-Vibe-Host": "CHEN"
+            },
+            "timeout": 10,
+            "type": "http",
+            "url": "http://192.168.20.103:17321/hooks"
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "headers": {
+              "Authorization": "Bearer 346c5eee22fcaea80fb852b41c13f44049dfc4460ef2a8ba159bb2489ca2610d",
+              "X-Vibe-Client": "qoder",
+              "X-Vibe-Host": "CHEN"
+            },
+            "timeout": 10,
+            "type": "http",
+            "url": "http://192.168.20.103:17321/hooks"
+          }
+        ]
+      }
+    ],
+    "PermissionDenied": [
+      {
+        "hooks": [
+          {
+            "headers": {
+              "Authorization": "Bearer 346c5eee22fcaea80fb852b41c13f44049dfc4460ef2a8ba159bb2489ca2610d",
+              "X-Vibe-Client": "qoder",
+              "X-Vibe-Host": "CHEN"
+            },
+            "timeout": 10,
+            "type": "http",
+            "url": "http://192.168.20.103:17321/hooks"
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "hooks": [
+          {
+            "headers": {
+              "Authorization": "Bearer 346c5eee22fcaea80fb852b41c13f44049dfc4460ef2a8ba159bb2489ca2610d",
+              "X-Vibe-Client": "qoder",
+              "X-Vibe-Host": "CHEN"
+            },
+            "timeout": 10,
+            "type": "http",
+            "url": "http://192.168.20.103:17321/hooks"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "headers": {
+              "Authorization": "Bearer 346c5eee22fcaea80fb852b41c13f44049dfc4460ef2a8ba159bb2489ca2610d",
+              "X-Vibe-Client": "qoder",
+              "X-Vibe-Host": "CHEN"
+            },
+            "timeout": 10,
+            "type": "http",
+            "url": "http://192.168.20.103:17321/hooks"
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "hooks": [
+          {
+            "headers": {
+              "Authorization": "Bearer 346c5eee22fcaea80fb852b41c13f44049dfc4460ef2a8ba159bb2489ca2610d",
+              "X-Vibe-Client": "qoder",
+              "X-Vibe-Host": "CHEN"
+            },
+            "timeout": 10,
+            "type": "http",
+            "url": "http://192.168.20.103:17321/hooks"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "headers": {
+              "Authorization": "Bearer 346c5eee22fcaea80fb852b41c13f44049dfc4460ef2a8ba159bb2489ca2610d",
+              "X-Vibe-Client": "qoder",
+              "X-Vibe-Host": "CHEN"
+            },
+            "timeout": 10,
+            "type": "http",
+            "url": "http://192.168.20.103:17321/hooks"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "headers": {
+              "Authorization": "Bearer 346c5eee22fcaea80fb852b41c13f44049dfc4460ef2a8ba159bb2489ca2610d",
+              "X-Vibe-Client": "qoder",
+              "X-Vibe-Host": "CHEN"
+            },
+            "timeout": 10,
+            "type": "http",
+            "url": "http://192.168.20.103:17321/hooks"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "headers": {
+              "Authorization": "Bearer 346c5eee22fcaea80fb852b41c13f44049dfc4460ef2a8ba159bb2489ca2610d",
+              "X-Vibe-Client": "qoder",
+              "X-Vibe-Host": "CHEN"
+            },
+            "timeout": 10,
+            "type": "http",
+            "url": "http://192.168.20.103:17321/hooks"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "headers": {
+              "Authorization": "Bearer 346c5eee22fcaea80fb852b41c13f44049dfc4460ef2a8ba159bb2489ca2610d",
+              "X-Vibe-Client": "qoder",
+              "X-Vibe-Host": "CHEN"
+            },
+            "timeout": 10,
+            "type": "http",
+            "url": "http://192.168.20.103:17321/hooks"
+          }
+        ]
+      }
+    ],
+    "StopFailure": [
+      {
+        "hooks": [
+          {
+            "headers": {
+              "Authorization": "Bearer 346c5eee22fcaea80fb852b41c13f44049dfc4460ef2a8ba159bb2489ca2610d",
+              "X-Vibe-Client": "qoder",
+              "X-Vibe-Host": "CHEN"
+            },
+            "timeout": 10,
+            "type": "http",
+            "url": "http://192.168.20.103:17321/hooks"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "headers": {
+              "Authorization": "Bearer 346c5eee22fcaea80fb852b41c13f44049dfc4460ef2a8ba159bb2489ca2610d",
+              "X-Vibe-Client": "qoder",
+              "X-Vibe-Host": "CHEN"
+            },
+            "timeout": 10,
+            "type": "http",
+            "url": "http://192.168.20.103:17321/hooks"
+          }
+        ]
+      }
+    ]
+  }
+}
