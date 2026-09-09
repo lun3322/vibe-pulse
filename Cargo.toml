@@ -2,6 +2,9 @@
 name = "vibe-pulse"
 version = "0.1.0"
 edition = "2024"
+description = "Native Windows status lights for Qoder and Claude Code sessions"
+readme = "README.md"
+license = "GPL-3.0-only"
 
 [dependencies]
 getrandom = "0.4.3"
