@@ -56,7 +56,8 @@ impl AppState {
             surface: LayeredSurface::new(scale)
                 .map_err(|error| win_error("无法创建绘制表面", error))?,
             _tray: TrayIcon::new(hwnd).map_err(|error| win_error("无法创建托盘图标", error))?,
-            tooltip: Tooltip::new(hwnd).map_err(|error| win_error("无法创建悬停提示", error))?,
+            tooltip: Tooltip::new(hwnd, scale)
+                .map_err(|error| win_error("无法创建悬停提示", error))?,
             events,
             sessions: SessionStore::default(),
             hovered: None,
@@ -72,7 +73,7 @@ impl AppState {
         if let Some(index) = self.hovered
             && let Some(session) = self.sessions.sessions().get(index)
         {
-            self.tooltip.show(session, Instant::now());
+            self.tooltip.show(session, Instant::now(), index)?;
         }
         self.draw(hwnd)
     }
@@ -94,9 +95,10 @@ impl AppState {
         if hovered != self.hovered {
             self.hovered = hovered;
             match hovered {
-                Some(index) => self
-                    .tooltip
-                    .show(&self.sessions.sessions()[index], Instant::now()),
+                Some(index) => {
+                    self.tooltip
+                        .show(&self.sessions.sessions()[index], Instant::now(), index)?
+                }
                 None => self.tooltip.hide(),
             }
             self.draw(hwnd)?;

@@ -12,6 +12,7 @@ use crate::tooltip_content::{TooltipContent, rgb};
 pub const WIDTH: i32 = 460;
 pub const HEIGHT: i32 = 126;
 pub const CORNER_RADIUS: i32 = 18;
+const CONTENT_PADDING: i32 = 14;
 
 type Hdc = windows::Win32::Graphics::Gdi::HDC;
 type TextFormat = windows::Win32::Graphics::Gdi::DRAW_TEXT_FORMAT;
@@ -43,10 +44,10 @@ unsafe fn draw_card(dc: Hdc, content: &TooltipContent) {
         draw_round_rect(
             dc,
             RECT {
-                left: 14,
-                top: 16,
-                right: 19,
-                bottom: HEIGHT - 16,
+                left: CONTENT_PADDING,
+                top: CONTENT_PADDING,
+                right: CONTENT_PADDING + 5,
+                bottom: HEIGHT - CONTENT_PADDING,
             },
             4,
             content.accent,
@@ -86,7 +87,7 @@ unsafe fn draw_inner_panel(dc: Hdc) {
             RECT {
                 left: 30,
                 top: 43,
-                right: WIDTH - 18,
+                right: WIDTH - CONTENT_PADDING,
                 bottom: 44,
             },
             1,
@@ -104,8 +105,8 @@ unsafe fn draw_content(dc: Hdc, content: &TooltipContent) {
             &content.title,
             RECT {
                 left: 31,
-                top: 13,
-                right: WIDTH - 18,
+                top: CONTENT_PADDING,
+                right: WIDTH - CONTENT_PADDING,
                 bottom: 36,
             },
             content.accent,
@@ -118,7 +119,7 @@ unsafe fn draw_content(dc: Hdc, content: &TooltipContent) {
             RECT {
                 left: 31,
                 top: 49,
-                right: WIDTH - 18,
+                right: WIDTH - CONTENT_PADDING,
                 bottom: 68,
             },
             rgb(147, 158, 160),
@@ -131,8 +132,8 @@ unsafe fn draw_content(dc: Hdc, content: &TooltipContent) {
             RECT {
                 left: 31,
                 top: 70,
-                right: WIDTH - 18,
-                bottom: 99,
+                right: WIDTH - CONTENT_PADDING,
+                bottom: 94,
             },
             rgb(229, 234, 234),
             content.body_font,
@@ -143,9 +144,9 @@ unsafe fn draw_content(dc: Hdc, content: &TooltipContent) {
             &content.status,
             RECT {
                 left: 47,
-                top: 103,
-                right: WIDTH - 18,
-                bottom: 121,
+                top: 95,
+                right: WIDTH - CONTENT_PADDING,
+                bottom: HEIGHT - CONTENT_PADDING,
             },
             content.status_color,
             content.body_font,
@@ -188,9 +189,9 @@ unsafe fn draw_status_dot(dc: Hdc, color: COLORREF) {
             dc,
             RECT {
                 left: 31,
-                top: 106,
+                top: 99,
                 right: 39,
-                bottom: 114,
+                bottom: 107,
             },
             8,
             color,

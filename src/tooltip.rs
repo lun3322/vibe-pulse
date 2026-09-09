@@ -1,11 +1,16 @@
+use std::mem::size_of;
+
 use windows::{
     Win32::{
-        Foundation::{ERROR_CLASS_ALREADY_EXISTS, HWND, LPARAM, LRESULT, POINT, WPARAM},
-        Graphics::Gdi::{CreateRoundRectRgn, DeleteObject, InvalidateRect, SetWindowRgn},
+        Foundation::{ERROR_CLASS_ALREADY_EXISTS, HWND, LPARAM, LRESULT, RECT, WPARAM},
+        Graphics::Gdi::{
+            CreateRoundRectRgn, DeleteObject, GetMonitorInfoW, InvalidateRect,
+            MONITOR_DEFAULTTONEAREST, MONITORINFO, MonitorFromWindow, SetWindowRgn,
+        },
         System::LibraryLoader::GetModuleHandleW,
         UI::WindowsAndMessaging::{
-            CreateWindowExW, DefWindowProcW, DestroyWindow, GWLP_USERDATA, GetCursorPos, IDC_ARROW,
-            LoadCursorW, RegisterClassW, SW_HIDE, SWP_NOACTIVATE, SWP_SHOWWINDOW,
+            CreateWindowExW, DefWindowProcW, DestroyWindow, GWLP_USERDATA, GetWindowRect,
+            IDC_ARROW, LoadCursorW, RegisterClassW, SW_HIDE, SWP_NOACTIVATE, SWP_SHOWWINDOW,
             SetWindowLongPtrW, SetWindowPos, ShowWindow, WINDOW_EX_STYLE, WM_ERASEBKGND, WM_PAINT,
             WNDCLASSW, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
         },
@@ -14,23 +19,30 @@ use windows::{
 };
 
 use crate::{
+    drawing::group_top,
     model::Session,
     tooltip_content::TooltipContent,
     tooltip_paint::{CORNER_RADIUS, HEIGHT, WIDTH},
 };
 
 const CLASS_NAME: PCWSTR = w!("VibePulseTooltipWindow");
-const CURSOR_OFFSET_X: i32 = 16;
-const CURSOR_OFFSET_Y: i32 = 20;
+const WINDOW_GAP: i32 = 14;
 const APP_FAILURE: HRESULT = HRESULT(0x80004005_u32 as i32);
+
+struct TooltipPosition {
+    x: i32,
+    y: i32,
+}
 
 pub struct Tooltip {
     hwnd: HWND,
+    owner: HWND,
+    scale: f32,
     content: Box<TooltipContent>,
 }
 
 impl Tooltip {
-    pub fn new(owner: HWND) -> Result<Self> {
+    pub fn new(owner: HWND, scale: f32) -> Result<Self> {
         register_class()?;
         let mut content = Box::new(TooltipContent::new()?);
         let hwnd = unsafe {
@@ -62,25 +74,56 @@ impl Tooltip {
             }
             return Err(error);
         }
-        Ok(Self { hwnd, content })
+        Ok(Self {
+            hwnd,
+            owner,
+            scale,
+            content,
+        })
     }
 
-    pub fn show(&mut self, session: &Session, now: std::time::Instant) {
+    pub fn show(
+        &mut self,
+        session: &Session,
+        now: std::time::Instant,
+        group_index: usize,
+    ) -> Result<()> {
         self.content.update(session, now);
-        let mut cursor = POINT::default();
+        let position = self.position(group_index)?;
         unsafe {
             let _ = InvalidateRect(Some(self.hwnd), None, false);
-            let _ = GetCursorPos(&mut cursor);
-            let _ = SetWindowPos(
+            SetWindowPos(
                 self.hwnd,
                 None,
-                cursor.x + CURSOR_OFFSET_X,
-                cursor.y + CURSOR_OFFSET_Y,
+                position.x,
+                position.y,
                 WIDTH,
                 HEIGHT,
                 SWP_NOACTIVATE | SWP_SHOWWINDOW,
-            );
+            )?;
         }
+        Ok(())
+    }
+
+    fn position(&self, group_index: usize) -> Result<TooltipPosition> {
+        let owner = window_rect(self.owner)?;
+        let work = monitor_work_area(self.owner)?;
+        let right = owner.right + WINDOW_GAP;
+        let left = owner.left - WINDOW_GAP - WIDTH;
+        let preferred_x = if right + WIDTH <= work.right {
+            right
+        } else {
+            left
+        };
+        Ok(TooltipPosition {
+            x: fit_axis(preferred_x, WIDTH, work.left, work.right),
+            y: fit_axis(
+                owner.top + group_top(group_index, self.scale),
+                HEIGHT,
+                work.top,
+                work.bottom,
+            ),
+        })
     }
 
     pub fn hide(&self) {
@@ -88,6 +131,29 @@ impl Tooltip {
             let _ = ShowWindow(self.hwnd, SW_HIDE);
         }
     }
+}
+
+fn window_rect(hwnd: HWND) -> Result<RECT> {
+    let mut rect = RECT::default();
+    unsafe { GetWindowRect(hwnd, &mut rect)? };
+    Ok(rect)
+}
+
+fn monitor_work_area(hwnd: HWND) -> Result<RECT> {
+    let monitor = unsafe { MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST) };
+    let mut info = MONITORINFO {
+        cbSize: size_of::<MONITORINFO>() as u32,
+        ..Default::default()
+    };
+    if unsafe { GetMonitorInfoW(monitor, &mut info) }.as_bool() {
+        Ok(info.rcWork)
+    } else {
+        Err(Error::from_thread())
+    }
+}
+
+fn fit_axis(position: i32, size: i32, minimum: i32, maximum: i32) -> i32 {
+    position.clamp(minimum, (maximum - size).max(minimum))
 }
 
 impl Drop for Tooltip {

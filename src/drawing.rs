@@ -6,6 +6,7 @@ use crate::{
 
 pub const BASE_WIDTH: i32 = 404;
 pub const GROUP_HEIGHT: i32 = 156;
+const GROUP_TOP: f32 = 12.0;
 const CLOSE_X: f32 = 377.0;
 const CLOSE_Y: f32 = 22.0;
 const CLOSE_HIT_RADIUS: f32 = 20.0;
@@ -30,7 +31,7 @@ impl Canvas {
         let outer = scaled_rect(
             Rect {
                 x: 18.0,
-                y: 12.0,
+                y: GROUP_TOP,
                 width: 368.0,
                 height: 132.0,
             },
@@ -184,6 +185,10 @@ pub fn group_at(y: i32, group_count: usize, scale: f32) -> Option<usize> {
     }
     let index = (y as f32 / (GROUP_HEIGHT as f32 * scale)) as usize;
     (index < group_count).then_some(index)
+}
+
+pub fn group_top(index: usize, scale: f32) -> i32 {
+    ((index as f32 * GROUP_HEIGHT as f32 + GROUP_TOP) * scale).round() as i32
 }
 
 pub fn close_at(x: i32, y: i32, group_count: usize, scale: f32) -> Option<usize> {
