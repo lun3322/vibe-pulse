@@ -70,6 +70,11 @@ cargo clippy --all-targets -- -D warnings
 cargo test
 ```
 
+
+## 鸣谢
+
+- 感谢 [LinuxDO](https://linux.do) 社区的支持
+
 ## 许可证
 
 项目使用 [GNU General Public License v3.0](LICENSE)，SPDX 标识为 `GPL-3.0-only`。
