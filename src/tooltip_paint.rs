@@ -1,16 +1,16 @@
 use windows::Win32::{
     Foundation::{COLORREF, HWND, RECT},
     Graphics::Gdi::{
-        BeginPaint, CreatePen, CreateSolidBrush, DT_END_ELLIPSIS, DT_NOPREFIX, DT_SINGLELINE,
-        DT_WORDBREAK, DeleteObject, DrawTextW, EndPaint, FillRect, HFONT, PAINTSTRUCT, PS_SOLID,
-        RoundRect, SelectObject, SetBkMode, SetTextColor, TRANSPARENT,
+        BeginPaint, CreatePen, CreateSolidBrush, DT_CALCRECT, DT_END_ELLIPSIS, DT_NOPREFIX,
+        DT_SINGLELINE, DT_WORDBREAK, DeleteObject, DrawTextW, EndPaint, FillRect, HFONT,
+        PAINTSTRUCT, PS_SOLID, RoundRect, SelectObject, SetBkMode, SetTextColor, TRANSPARENT,
     },
 };
 
 use crate::tooltip_content::{TooltipContent, rgb};
 
 pub const WIDTH: i32 = 460;
-pub const HEIGHT: i32 = 126;
+pub const HEIGHT: i32 = 148;
 pub const CORNER_RADIUS: i32 = 18;
 const CONTENT_PADDING: i32 = 14;
 
@@ -126,33 +126,80 @@ unsafe fn draw_content(dc: Hdc, content: &TooltipContent) {
             content.body_font,
             DT_SINGLELINE | DT_END_ELLIPSIS | DT_NOPREFIX,
         );
-        draw_text(
-            dc,
-            &content.prompt,
-            RECT {
-                left: 31,
-                top: 70,
-                right: WIDTH - CONTENT_PADDING,
-                bottom: 94,
-            },
-            rgb(229, 234, 234),
-            content.body_font,
-            DT_WORDBREAK | DT_END_ELLIPSIS | DT_NOPREFIX,
-        );
+        draw_prompt(dc, content);
         draw_text(
             dc,
             &content.status,
             RECT {
                 left: 47,
-                top: 95,
+                top: 116,
                 right: WIDTH - CONTENT_PADDING,
-                bottom: HEIGHT - CONTENT_PADDING,
+                bottom: 134,
             },
             content.status_color,
             content.body_font,
             DT_SINGLELINE | DT_END_ELLIPSIS | DT_NOPREFIX,
         );
     }
+}
+
+unsafe fn draw_prompt(dc: Hdc, content: &TooltipContent) {
+    let mut bounds = RECT {
+        left: 31,
+        top: 70,
+        right: WIDTH - CONTENT_PADDING,
+        bottom: 109,
+    };
+    unsafe {
+        let previous = SelectObject(dc, content.body_font.into());
+        SetTextColor(dc, rgb(229, 234, 234));
+        let text = fit_wrapped_text(dc, &content.prompt, &bounds);
+        let mut encoded: Vec<u16> = text.encode_utf16().collect();
+        DrawTextW(dc, &mut encoded, &mut bounds, DT_WORDBREAK | DT_NOPREFIX);
+        SelectObject(dc, previous);
+    }
+}
+
+unsafe fn fit_wrapped_text(dc: Hdc, text: &str, bounds: &RECT) -> String {
+    if unsafe { wrapped_text_fits(dc, text, bounds) } {
+        return text.to_owned();
+    }
+    let characters: Vec<char> = text.chars().collect();
+    let mut minimum = 0;
+    let mut maximum = characters.len();
+    while minimum < maximum {
+        let middle = (minimum + maximum).div_ceil(2);
+        let candidate = ellipsized(&characters[..middle]);
+        if unsafe { wrapped_text_fits(dc, &candidate, bounds) } {
+            minimum = middle;
+        } else {
+            maximum = middle - 1;
+        }
+    }
+    ellipsized(&characters[..minimum])
+}
+
+unsafe fn wrapped_text_fits(dc: Hdc, text: &str, bounds: &RECT) -> bool {
+    let mut measured = RECT {
+        left: 0,
+        top: 0,
+        right: bounds.right - bounds.left,
+        bottom: 0,
+    };
+    let mut encoded: Vec<u16> = text.encode_utf16().collect();
+    unsafe {
+        DrawTextW(
+            dc,
+            &mut encoded,
+            &mut measured,
+            DT_CALCRECT | DT_WORDBREAK | DT_NOPREFIX,
+        );
+    }
+    measured.bottom <= bounds.bottom - bounds.top
+}
+
+fn ellipsized(characters: &[char]) -> String {
+    format!("{}...", characters.iter().collect::<String>().trim_end())
 }
 
 unsafe fn draw_round_rect(
@@ -189,9 +236,9 @@ unsafe fn draw_status_dot(dc: Hdc, color: COLORREF) {
             dc,
             RECT {
                 left: 31,
-                top: 99,
+                top: 120,
                 right: 39,
-                bottom: 107,
+                bottom: 128,
             },
             8,
             color,
@@ -222,5 +269,17 @@ unsafe fn draw_text(
         SetTextColor(dc, color);
         DrawTextW(dc, &mut text, &mut rect, format);
         SelectObject(dc, previous);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ellipsized;
+
+    #[test]
+    fn ellipsis_preserves_unicode_and_removes_trailing_space() {
+        let characters: Vec<char> = "两行摘要 ".chars().collect();
+
+        assert_eq!(ellipsized(&characters), "两行摘要...");
     }
 }

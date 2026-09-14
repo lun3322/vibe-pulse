@@ -23,6 +23,7 @@ mod tooltip;
 mod tooltip_content;
 mod tooltip_paint;
 mod tray;
+mod window_position;
 
 use app::{AppState, HOOK_EVENT_MESSAGE};
 use renderer::pixel_size;
@@ -42,9 +43,9 @@ use windows::{
                 CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, GWLP_USERDATA,
                 GetMessageW, HTCAPTION, IDC_ARROW, KillTimer, LoadCursorW, MB_ICONERROR, MB_OK,
                 MSG, MessageBoxW, PostQuitMessage, RegisterClassW, SendMessageW, SetTimer,
-                SetWindowLongPtrW, TranslateMessage, WINDOW_EX_STYLE, WM_DESTROY, WM_LBUTTONDOWN,
-                WM_MOUSEMOVE, WM_NCDESTROY, WM_NCLBUTTONDOWN, WM_TIMER, WNDCLASSW, WS_EX_LAYERED,
-                WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
+                SetWindowLongPtrW, TranslateMessage, WINDOW_EX_STYLE, WM_DESTROY, WM_DISPLAYCHANGE,
+                WM_LBUTTONDOWN, WM_MOUSEMOVE, WM_NCDESTROY, WM_NCLBUTTONDOWN, WM_TIMER, WNDCLASSW,
+                WS_EX_LAYERED, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
             },
         },
     },
@@ -167,6 +168,7 @@ unsafe extern "system" fn window_proc(
             handle_tray_action(hwnd, lparam);
             return LRESULT(0);
         }
+        WM_DISPLAYCHANGE => Some(window_position::ensure_visible(hwnd)),
         WM_DESTROY => {
             unsafe {
                 let _ = KillTimer(Some(hwnd), TIMER_ID);

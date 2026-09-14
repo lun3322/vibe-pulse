@@ -23,6 +23,7 @@ use crate::{
     model::Session,
     tooltip_content::TooltipContent,
     tooltip_paint::{CORNER_RADIUS, HEIGHT, WIDTH},
+    window_position::fit_axis,
 };
 
 const CLASS_NAME: PCWSTR = w!("VibePulseTooltipWindow");
@@ -150,10 +151,6 @@ fn monitor_work_area(hwnd: HWND) -> Result<RECT> {
     } else {
         Err(Error::from_thread())
     }
-}
-
-fn fit_axis(position: i32, size: i32, minimum: i32, maximum: i32) -> i32 {
-    position.clamp(minimum, (maximum - size).max(minimum))
 }
 
 impl Drop for Tooltip {

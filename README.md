@@ -36,10 +36,10 @@ cargo build --release
 1. 运行 `vibe-pulse.exe`。
 2. 右键托盘中的交通灯图标，打开“配置”。
 3. 本机使用时保留 `127.0.0.1`。
-4. WSL2 或局域网使用时，打开局域网接入并选择内网 IPv4，然后重启程序。
+4. WSL2 或局域网使用时，打开局域网地址选项并选择内网 IPv4。
 5. 复制 Qoder 或 Claude Code 配置，再合并到对应客户端的配置文件。
 
-Hook 服务监听 `17321` 端口。
+Hook 服务在本机全部 IPv4 网卡的 `17321` 端口监听。
 
 ```text
 http://<服务地址>:17321/hooks
@@ -58,9 +58,9 @@ http://<服务地址>:17321/hooks
 
 ## 配置与安全
 
-程序会在 EXE 同目录创建 `vibe-pulse.settings.json`，其中保存服务地址、局域网开关和 Bearer Token。
+程序会在 EXE 同目录创建 `vibe-pulse.settings.json`，其中保存服务地址、地址选择方式和 Bearer Token。
 
-不要公开这个文件。开启局域网接入后，程序会监听本机网络接口，没有正确 Token 的请求会被拒绝。
+不要公开这个文件。程序始终监听本机全部 IPv4 网络接口，没有正确 Token 的请求会被拒绝。
 
 ## 开发检查
 

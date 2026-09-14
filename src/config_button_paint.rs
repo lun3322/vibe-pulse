@@ -97,7 +97,7 @@ unsafe fn draw_scope(item: &DRAWITEMSTRUCT, font: HFONT, allow_lan: bool) {
         primitive::text(
             item.hDC,
             TextSpec {
-                value: "允许 WSL2 / 局域网接入（重启软件后生效）",
+                value: "使用 WSL2 / 局域网地址生成配置",
                 rect: RECT {
                     left: 72,
                     top: 0,

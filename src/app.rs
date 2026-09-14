@@ -43,14 +43,8 @@ impl AppState {
     pub fn new(hwnd: HWND, scale: f32) -> Result<Self> {
         let settings = Settings::load_or_create().map_err(app_error)?;
         let (sender, events) = mpsc::channel();
-        let server = HookServer::start(
-            hwnd,
-            HOOK_EVENT_MESSAGE,
-            settings.token.clone(),
-            settings.allow_lan,
-            sender,
-        )
-        .map_err(app_error)?;
+        let server = HookServer::start(hwnd, HOOK_EVENT_MESSAGE, settings.token.clone(), sender)
+            .map_err(app_error)?;
         Ok(Self {
             _server: server,
             surface: LayeredSurface::new(scale)

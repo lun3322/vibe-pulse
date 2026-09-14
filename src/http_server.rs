@@ -19,6 +19,7 @@ use windows::Win32::{
 use crate::model::{ClientKind, HookEvent};
 
 pub const PORT: u16 = 17_321;
+const ALL_IPV4_INTERFACES: &str = "0.0.0.0";
 const MAX_BODY_BYTES: usize = 256 * 1024;
 const RECEIVE_TIMEOUT: Duration = Duration::from_millis(100);
 
@@ -32,14 +33,9 @@ impl HookServer {
         hwnd: HWND,
         message: u32,
         token: String,
-        allow_lan: bool,
         events: Sender<HookEvent>,
     ) -> Result<Self, String> {
-        let address = if allow_lan {
-            format!("0.0.0.0:{PORT}")
-        } else {
-            format!("127.0.0.1:{PORT}")
-        };
+        let address = listen_address();
         let server = Server::http(&address)
             .map_err(|error| format!("无法监听 HTTP Hook 地址 {address}：{error}"))?;
         let stop = Arc::new(AtomicBool::new(false));
@@ -62,6 +58,10 @@ impl Drop for HookServer {
             let _ = thread.join();
         }
     }
+}
+
+fn listen_address() -> String {
+    format!("{ALL_IPV4_INTERFACES}:{PORT}")
 }
 
 fn serve(
@@ -170,7 +170,12 @@ fn respond(request: Request, status: u16) {
 
 #[cfg(test)]
 mod tests {
-    use super::secure_equal;
+    use super::{listen_address, secure_equal};
+
+    #[test]
+    fn listens_on_all_ipv4_interfaces() {
+        assert_eq!(listen_address(), "0.0.0.0:17321");
+    }
 
     #[test]
     fn token_comparison_requires_exact_value() {
