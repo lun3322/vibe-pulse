@@ -16,13 +16,12 @@ use crate::{
     config_combo_box,
     config_controls::{
         ADDRESS_ID, ADDRESS_TOP, CLOSE_ID, CLOSE_LEFT, COPY_CLAUDE_ID, COPY_QODER_ID, COPY_TOP,
-        ConfigControls, FIELD_LEFT, FIELD_WIDTH, HOST_ID, HOST_TOP, LAN_ID, LAN_TOP,
+        ConfigControls, FIELD_LEFT, FIELD_WIDTH, HOST_ID, HOST_TOP,
     },
 };
 
 const FIELD_HEIGHT: i32 = 32;
 const COMBO_HEIGHT: i32 = 200;
-const LAN_HEIGHT: i32 = 36;
 const COPY_LEFT: i32 = 36;
 const COPY_SECOND_LEFT: i32 = 360;
 const COPY_WIDTH: i32 = 304;
@@ -54,18 +53,6 @@ struct ButtonSpec<'a> {
 pub fn create(parent: HWND, font: HFONT) -> Result<ConfigControls> {
     let address = create_address(parent, font)?;
     let host = create_host(parent, font)?;
-    let lan = create_owner_button(
-        parent,
-        font,
-        ButtonSpec {
-            text: "访问范围",
-            x: FIELD_LEFT,
-            y: LAN_TOP,
-            width: FIELD_WIDTH,
-            height: LAN_HEIGHT,
-            id: LAN_ID,
-        },
-    )?;
     create_owner_button(
         parent,
         font,
@@ -79,7 +66,7 @@ pub fn create(parent: HWND, font: HFONT) -> Result<ConfigControls> {
         },
     )?;
     create_copy_buttons(parent, font)?;
-    Ok(ConfigControls { address, host, lan })
+    Ok(ConfigControls { address, host })
 }
 
 fn create_address(parent: HWND, font: HFONT) -> Result<HWND> {

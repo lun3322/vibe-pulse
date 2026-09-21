@@ -128,7 +128,6 @@ fn handle_window_command(hwnd: HWND, wparam: WPARAM) -> LRESULT {
         state.handle(Command {
             hwnd,
             identifier: (wparam.0 & 0xffff) as isize,
-            notification: ((wparam.0 >> 16) & 0xffff) as u32,
         })
     });
     match result {

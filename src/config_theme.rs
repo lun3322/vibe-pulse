@@ -78,9 +78,9 @@ impl ConfigTheme {
         unsafe { color_control(wparam, PANEL) }
     }
 
-    pub unsafe fn draw_button(&self, lparam: LPARAM, allow_lan: bool) {
+    pub unsafe fn draw_button(&self, lparam: LPARAM) {
         let item = unsafe { &*(lparam.0 as *const DRAWITEMSTRUCT) };
-        unsafe { config_button_paint::draw(item, self.body_font, allow_lan) };
+        unsafe { config_button_paint::draw(item, self.body_font) };
     }
 }
 

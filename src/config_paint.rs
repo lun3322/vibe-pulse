@@ -52,16 +52,16 @@ pub unsafe fn paint_window(context: WindowPaint<'_>) {
                 left: 20,
                 top: 76,
                 right: client.right - 20,
-                bottom: 250,
+                bottom: 198,
             },
         );
         draw_panel(
             dc,
             RECT {
                 left: 20,
-                top: 262,
+                top: 210,
                 right: client.right - 20,
-                bottom: 360,
+                bottom: 308,
             },
         );
         draw_titlebar(dc, context.title_font);
@@ -157,7 +157,7 @@ unsafe fn draw_service_labels(dc: HDC, font: HFONT) {
         draw_label(
             dc,
             LabelSpec {
-                value: "服务地址",
+                value: "Hook 地址",
                 top: 92,
                 font,
             },
@@ -173,7 +173,7 @@ unsafe fn draw_service_labels(dc: HDC, font: HFONT) {
         primitive::text(
             dc,
             TextSpec {
-                value: "用于区分发出 Hook 的电脑或 WSL 实例，并显示在悬停信息中。",
+                value: "用于区分发出 Hook 的设备，并显示在悬停信息中。",
                 rect: RECT {
                     left: FIELD_LEFT,
                     top: 167,
@@ -183,14 +183,6 @@ unsafe fn draw_service_labels(dc: HDC, font: HFONT) {
                 color: MUTED,
                 font,
                 flags: DT_SINGLELINE | DT_END_ELLIPSIS | DT_NOPREFIX,
-            },
-        );
-        draw_label(
-            dc,
-            LabelSpec {
-                value: "访问范围",
-                top: 203,
-                font,
             },
         );
     }
@@ -204,9 +196,9 @@ unsafe fn draw_authorization(dc: HDC, font: HFONT, token_fingerprint: &str) {
                 value: "AUTHORIZATION",
                 rect: RECT {
                     left: LABEL_LEFT,
-                    top: 277,
+                    top: 225,
                     right: 210,
-                    bottom: 298,
+                    bottom: 246,
                 },
                 color: ORANGE,
                 font,
@@ -219,9 +211,9 @@ unsafe fn draw_authorization(dc: HDC, font: HFONT, token_fingerprint: &str) {
                 value: "首次运行生成 256 位随机令牌并持久保存；打开窗口不会重新生成。",
                 rect: RECT {
                     left: LABEL_LEFT,
-                    top: 307,
+                    top: 255,
                     right: CONTENT_RIGHT,
-                    bottom: 327,
+                    bottom: 275,
                 },
                 color: TEXT,
                 font,
@@ -234,9 +226,9 @@ unsafe fn draw_authorization(dc: HDC, font: HFONT, token_fingerprint: &str) {
                 value: token_fingerprint,
                 rect: RECT {
                     left: LABEL_LEFT,
-                    top: 329,
+                    top: 277,
                     right: CONTENT_RIGHT,
-                    bottom: 346,
+                    bottom: 294,
                 },
                 color: MUTED,
                 font,

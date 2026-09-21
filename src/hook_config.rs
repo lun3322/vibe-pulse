@@ -49,12 +49,13 @@ mod tests {
     fn generated_config_contains_identity_and_token() {
         let config = generate(
             "claude-code",
-            "http://127.0.0.1:17321/hooks",
+            "http://localhost:17321/hooks",
             "secret",
             "desk",
         );
         let value: Value = serde_json::from_str(&config).unwrap();
         let hook = &value["hooks"]["SessionStart"][0]["hooks"][0];
+        assert_eq!(hook["url"], "http://localhost:17321/hooks");
         assert_eq!(hook["headers"]["Authorization"], "Bearer secret");
         assert_eq!(hook["headers"]["X-Vibe-Client"], "claude-code");
         assert_eq!(hook["headers"]["X-Vibe-Host"], "desk");

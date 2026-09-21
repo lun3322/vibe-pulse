@@ -209,12 +209,16 @@ mod tests {
     const TEST_TIMEOUT: Duration = Duration::from_secs(2);
 
     #[test]
-    fn handles_concurrent_ipv4_and_ipv6_requests() {
+    fn binds_all_ipv4_interfaces_and_handles_ipv4_and_ipv6_requests() {
         let servers = create_servers(0).unwrap();
+        let bound_addresses = servers
+            .iter()
+            .map(|server| server.server_addr().to_ip().unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(bound_addresses[0].ip(), IpAddr::V4(Ipv4Addr::UNSPECIFIED));
+        assert_eq!(bound_addresses[1].ip(), IpAddr::V6(Ipv6Addr::LOCALHOST));
         let addresses = servers.iter().map(client_address).collect::<Vec<_>>();
         assert_eq!(addresses[0].port(), addresses[1].port());
-        assert!(addresses.iter().any(|address| address.is_ipv4()));
-        assert!(addresses.iter().any(|address| address.is_ipv6()));
         let workers = servers
             .into_iter()
             .map(|server| {

@@ -10,9 +10,6 @@ const TOKEN_BYTES: usize = 32;
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Settings {
     pub token: String,
-    pub allow_lan: bool,
-    #[serde(default = "default_address")]
-    pub selected_address: String,
 }
 
 impl Settings {
@@ -30,8 +27,6 @@ impl Settings {
         }
         let settings = Self {
             token: generate_token()?,
-            allow_lan: false,
-            selected_address: default_address(),
         };
         settings.save()?;
         Ok(settings)
@@ -90,19 +85,33 @@ fn validate_token(token: &str) -> Result<(), String> {
     }
 }
 
-fn default_address() -> String {
-    "127.0.0.1".to_owned()
-}
-
 #[cfg(test)]
 mod tests {
-    use super::{generate_token, validate_token};
+    use serde_json::json;
+
+    use super::{Settings, TOKEN_BYTES, generate_token, validate_token};
 
     #[test]
     fn token_has_256_bits_encoded_as_hex() {
         let token = generate_token().unwrap();
-        assert_eq!(token.len(), 64);
+        assert_eq!(token.len(), TOKEN_BYTES * 2);
         assert!(token.bytes().all(|byte| byte.is_ascii_hexdigit()));
         assert!(validate_token(&token).is_ok());
+    }
+
+    #[test]
+    fn legacy_address_settings_are_not_persisted() {
+        let token = "a".repeat(TOKEN_BYTES * 2);
+        let settings: Settings = serde_json::from_value(json!({
+            "token": token.clone(),
+            "allow_lan": true,
+            "selected_address": "192.168.1.9"
+        }))
+        .unwrap();
+
+        assert_eq!(
+            serde_json::to_value(settings).unwrap(),
+            json!({ "token": token })
+        );
     }
 }

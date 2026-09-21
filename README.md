@@ -9,7 +9,7 @@ Vibe Pulse 是一个 Windows 原生状态灯，用来显示 Qoder 和 Claude Cod
 ## 主要功能
 
 - 同时显示多个 Qoder 和 Claude Code 会话
-- 支持 Windows、WSL2 和局域网设备发送 HTTP Hook
+- 支持本机和局域网设备发送 HTTP Hook
 - 提示卡会根据屏幕空间显示在灯的左侧或右侧
 - 悬浮窗可以拖动，也可以手动关闭单个会话
 - 托盘配置窗口可以直接复制 Qoder 和 Claude Code 配置
@@ -35,14 +35,13 @@ cargo build --release
 
 1. 运行 `vibe-pulse.exe`。
 2. 右键托盘中的交通灯图标，打开“配置”。
-3. 本机使用时保留 `127.0.0.1`。
-4. WSL2 或局域网使用时，打开局域网地址选项并选择内网 IPv4。
-5. 复制 Qoder 或 Claude Code 配置，再合并到对应客户端的配置文件。
+3. 在 Hook 地址下拉框中选择 `localhost` 或本机内网 IPv4；该选择仅用于生成复制配置中的 Hook URL。
+4. 复制 Qoder 或 Claude Code 配置，再合并到对应客户端的配置文件。
 
-Hook 服务在本机全部 IPv4 网卡的 `17321` 端口监听。
+Hook 服务始终在本机全部 IPv4 网卡的 `17321` 端口监听。
 
 ```text
-http://<服务地址>:17321/hooks
+http://<Hook 地址>:17321/hooks
 ```
 
 ## 状态说明
@@ -58,7 +57,7 @@ http://<服务地址>:17321/hooks
 
 ## 配置与安全
 
-程序会在 EXE 同目录创建 `vibe-pulse.settings.json`，其中保存服务地址、地址选择方式和 Bearer Token。
+程序会在 EXE 同目录创建 `vibe-pulse.settings.json`，其中保存 Bearer Token。
 
 不要公开这个文件。程序始终监听本机全部 IPv4 网络接口，没有正确 Token 的请求会被拒绝。
 
